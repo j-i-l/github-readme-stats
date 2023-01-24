@@ -29,6 +29,7 @@ export default async (req, res) => {
     locale,
     border_radius,
     border_color,
+    role,
     disable_animations,
   } = req.query;
   res.setHeader("Content-Type", "image/svg+xml");
@@ -44,6 +45,7 @@ export default async (req, res) => {
   try {
     const topLangs = await fetchTopLanguages(
       username,
+      parseArray(role),
       parseArray(exclude_repo),
     );
 

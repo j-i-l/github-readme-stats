@@ -32,8 +32,8 @@ const GRAPHQL_REPOS_FIELD = `
 `;
 
 const GRAPHQL_REPOS_QUERY = `
-  query userInfo($login: String!, $after: String) {
-    user(login: $login) {
+  query userInfo($login: String!, $after: String, $ownerAffiliations: [RepositoryAffiliation]) {
+    user(login: $login, ownerAffiliations: $ownerAffiliations) {
       ${GRAPHQL_REPOS_FIELD}
     }
   }
@@ -96,12 +96,17 @@ const fetcher = (variables, token) => {
  *
  * @description This function supports multi-page fetching if the 'FETCH_MULTI_PAGE_STARS' environment variable is set to true.
  */
-const statsFetcher = async (username) => {
+const statsFetcher = async (username, ownerAffiliations) => {
   let stats;
   let hasNextPage = true;
   let endCursor = null;
   while (hasNextPage) {
-    const variables = { login: username, first: 100, after: endCursor };
+    const variables = {
+      login: username,
+      first: 100,
+      after: endCursor,
+      ownerAffiliations: [ownerAffiliations],
+    };
     let res = await retryer(fetcher, variables);
     if (res.data.errors) return res;
 
@@ -175,6 +180,8 @@ const totalCommitsFetcher = async (username) => {
  * @param {string} username GitHub username.
  * @param {boolean} count_private Include private contributions.
  * @param {boolean} include_all_commits Include all commits.
+ * @param {string[]} exclude_repo Repositories to exclude.  Default: [].
+ * @param {string[]} ownerAffiliations Owner affiliations. Default: OWNER.
  * @returns {Promise<import("./types").StatsData>} Stats data.
  */
 const fetchStats = async (
@@ -182,6 +189,7 @@ const fetchStats = async (
   count_private = false,
   include_all_commits = false,
   exclude_repo = [],
+  ownerAffiliations = [],
 ) => {
   if (!username) throw new MissingParamError(["username"]);
 
@@ -195,7 +203,15 @@ const fetchStats = async (
     rank: { level: "C", score: 0 },
   };
 
-  let res = await statsFetcher(username);
+  // Set default value for ownerAffiliations.
+  // NOTE: Done here since parseArray() will always return an empty array even nothing
+  //was specified.
+  ownerAffiliations =
+    ownerAffiliations && ownerAffiliations.length > 0
+      ? ownerAffiliations
+      : ["OWNER"];
+
+  let res = await statsFetcher(username, ownerAffiliations);
 
   // Catch GraphQL errors.
   if (res.data.errors) {
